@@ -72,6 +72,11 @@ func (sc *Controller) registerRoutes() {
 		RegisterE2BRoute(sc.mux, http.MethodPost, "/api-keys", sc.CreateAPIKey, sc.CheckApiKey, sc.CheckCreateAPIKeyPermission)
 		RegisterE2BRoute(sc.mux, http.MethodDelete, "/api-keys/{apiKeyID}", sc.DeleteAPIKey, sc.CheckApiKey, sc.CheckDeleteAPIKeyPermission)
 	}
+
+	// Team quota management endpoints
+	RegisterE2BRoute(sc.mux, http.MethodGet, "/teams/{teamName}/quota", sc.GetTeamQuota, sc.CheckApiKey)
+	RegisterE2BRoute(sc.mux, http.MethodPut, "/teams/{teamName}/quota", sc.SetTeamQuota, sc.CheckApiKey)
+	RegisterE2BRoute(sc.mux, http.MethodDelete, "/teams/{teamName}/quota", sc.DeleteTeamQuota, sc.CheckApiKey)
 }
 
 func RegisterE2BRoute[T any](mux *http.ServeMux, method, path string, handler web.Handler[T], middlewares ...web.MiddleWare) {

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
 
+	"github.com/openkruise/agents/api/v1alpha1"
 	"github.com/openkruise/agents/pkg/features"
 	"github.com/openkruise/agents/pkg/sandbox-manager/config"
 	"github.com/openkruise/agents/pkg/sandbox-manager/infra"
@@ -56,6 +57,11 @@ func (sc *Controller) CreateSandbox(r *http.Request) (web.ApiResponse[*models.Sa
 	}
 	namespace := sc.getNamespaceOfUser(user)
 	log.Info("create sandbox request received", "request", request)
+
+	if apiErr := sc.checkTeamQuota(ctx, namespace); apiErr != nil {
+		return web.ApiResponse[*models.Sandbox]{}, apiErr
+	}
+
 	if sc.manager.GetInfra().HasTemplate(ctx, infra.HasTemplateOptions{
 		Namespace: namespace,
 		Name:      request.TemplateID,
@@ -344,4 +350,45 @@ func (sc *Controller) csiMountOptionsConfigRecord(ctx context.Context, sbx infra
 	// record the csi mount config to annotation
 	annotations[models.ExtensionKeyClaimWithCSIMount_MountConfig] = string(csiMountConfigRaw)
 	sbx.SetAnnotations(annotations)
+}
+
+// checkTeamQuota returns a 429 error when the team has exceeded its sandbox quota.
+// It is a no-op (returns nil) when quota is not configured or the quota storage is unavailable.
+func (sc *Controller) checkTeamQuota(ctx context.Context, namespace string) *web.ApiError {
+	if sc.quota == nil || namespace == "" {
+		return nil
+	}
+	max, configured, err := sc.quota.GetTeamMaxSandboxes(ctx, namespace)
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "failed to read team quota, skipping enforcement", "namespace", namespace)
+		return nil
+	}
+	if !configured {
+		return nil
+	}
+	sandboxes, err := sc.manager.GetInfra().SelectSandboxes(ctx, infra.SelectSandboxesOptions{Namespace: namespace})
+	if err != nil {
+		klog.FromContext(ctx).Error(err, "failed to count active sandboxes for quota check", "namespace", namespace)
+		return nil
+	}
+	active := countActiveSandboxes(sandboxes)
+	if active >= max {
+		return &web.ApiError{
+			Code:    http.StatusTooManyRequests,
+			Message: fmt.Sprintf("sandbox quota exceeded for team %s: limit %d, active %d", namespace, max, active),
+		}
+	}
+	return nil
+}
+
+// countActiveSandboxes counts sandboxes that are Running or Paused (i.e. claimed, not dead or pooled).
+func countActiveSandboxes(sandboxes []infra.Sandbox) int {
+	count := 0
+	for _, sbx := range sandboxes {
+		state, _ := sbx.GetState()
+		if state != v1alpha1.SandboxStateAvailable && state != v1alpha1.SandboxStateCreating && state != v1alpha1.SandboxStateDead {
+			count++
+		}
+	}
+	return count
 }
