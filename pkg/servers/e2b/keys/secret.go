@@ -317,12 +317,17 @@ func (k *secretKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTea
 		team = &models.Team{ID: generateUUID(), Name: teamName}
 	}
 
-	var newID, newKey uuid.UUID
+	var newID uuid.UUID
+	var newKeyStr string
 	for i := 0; i < 100; i++ {
 		newID = generateUUID()
-		newKey = generateUUID()
+		key, err := GenerateAPIKey()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate api-key: %w", err)
+		}
+		newKeyStr = key
 		_, ok1 := k.LoadByID(ctx, newID.String())
-		_, ok2 := k.LoadByKey(ctx, newKey.String())
+		_, ok2 := k.LoadByKey(ctx, newKeyStr)
 		if !ok1 && !ok2 {
 			break
 		}
@@ -334,7 +339,7 @@ func (k *secretKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTea
 	apiKey := &models.CreatedTeamAPIKey{
 		CreatedAt: time.Now(),
 		ID:        newID,
-		Key:       newKey.String(),
+		Key:       newKeyStr,
 		Mask:      models.IdentifierMaskingDetails{},
 		Name:      opts.Name,
 		Team:      cloneTeam(team),

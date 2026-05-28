@@ -39,3 +39,20 @@ if __name__ == "__main__":
     with Sandbox.create() as sbx:
         sbx.run_code("print('hello world')")
 ```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `https` | bool | `True` | Whether to use HTTPS for the API URL. |
+| `bypass_key_validation` | bool | `False` | Set to `True` when using legacy keys that don't match the `e2b_<hex>` format. |
+
+### API Key Format
+
+Starting from E2B SDK v2.25.0, the SDK validates API keys client-side. Keys must match the pattern `e2b_` followed by
+hex characters.
+
+OpenKruise Agents sandbox-manager now generates keys in this format by default. If you have legacy API keys (e.g. UUID
+format), use:
+
+```python
+patch_e2b(https=False, bypass_key_validation=True)
+```

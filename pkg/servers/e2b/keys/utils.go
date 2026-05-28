@@ -17,10 +17,36 @@ limitations under the License.
 package keys
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"regexp"
 
 	"github.com/openkruise/agents/pkg/servers/e2b/models"
 )
+
+// APIKeyPrefix is the prefix required by E2B SDK client-side validation.
+const APIKeyPrefix = "e2b_"
+
+// apiKeyRandBytes is the number of random bytes used to generate a key body (40 hex chars).
+const apiKeyRandBytes = 20
+
+// e2bKeyPattern is the regex enforced by the E2B SDK client-side validation.
+var e2bKeyPattern = regexp.MustCompile(`^e2b_[0-9a-f]+$`)
+
+// GenerateAPIKey generates a cryptographically random E2B-compatible API key: "e2b_" + 40 hex chars.
+func GenerateAPIKey() (string, error) {
+	b := make([]byte, apiKeyRandBytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return APIKeyPrefix + hex.EncodeToString(b), nil
+}
+
+// IsValidAPIKeyFormat checks if a key matches the E2B SDK expected format: "e2b_" + 40 hex chars.
+func IsValidAPIKeyFormat(key string) bool {
+	return e2bKeyPattern.MatchString(key)
+}
 
 // TeamForKey returns the team for an API key, defaulting to AdminTeam for legacy keys without team information.
 func TeamForKey(user *models.CreatedTeamAPIKey) *models.Team {

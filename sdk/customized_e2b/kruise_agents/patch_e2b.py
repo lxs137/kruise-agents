@@ -25,10 +25,24 @@ def __connection_config_get_sandbox_url_http(self, sandbox_id: str, sandbox_doma
 def __jupyter_url_http(self) -> str:
     return f"http://{__sandbox_get_host(self, JUPYTER_PORT)}"
 
-def patch_e2b(https: bool = True):
+def patch_e2b(https: bool = True, bypass_key_validation: bool = False):
+    """Patch E2B SDK to work with OpenKruise Agents.
+
+    Args:
+        https: Whether to use HTTPS for the API URL.
+        bypass_key_validation: If True, disable client-side API key format
+            validation added in newer E2B SDK versions. This allows using
+            keys that don't match the ``e2b_<hex>`` format.
+    """
     os.environ["E2B_API_URL"] = __get_api_url(https)
     SandboxBase.get_host = __sandbox_get_host
     ConnectionConfig.get_host = __connection_config_get_host
     if not https:
         ConnectionConfig.get_sandbox_url = __connection_config_get_sandbox_url_http
         setattr(SandboxSync, '_jupyter_url', property(__jupyter_url_http))
+    if bypass_key_validation:
+        try:
+            import e2b.api as _e2b_api
+            _e2b_api.validate_api_key = lambda _key: None
+        except (ImportError, AttributeError):
+            pass

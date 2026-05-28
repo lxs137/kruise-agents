@@ -331,7 +331,8 @@ func (k *mysqlKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTeam
 		return nil, err
 	}
 
-	var newID, newKey uuid.UUID
+	var newID uuid.UUID
+	var newKeyStr string
 	var entity TeamAPIKeyEntity
 	var team *models.Team
 	if retryErr := retry.OnError(wait.Backoff{
@@ -346,7 +347,11 @@ func (k *mysqlKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTeam
 		default:
 		}
 		newID = generateUUID()
-		newKey = generateUUID()
+		generatedKey, genErr := GenerateAPIKey()
+		if genErr != nil {
+			return fmt.Errorf("failed to generate api-key: %w", genErr)
+		}
+		newKeyStr = generatedKey
 		createdBy := key.ID.String()
 		db := k.db.WithContext(ctx)
 		teamEntity, err := k.getOrCreateTeamDB(ctx, db, teamName)
@@ -360,7 +365,7 @@ func (k *mysqlKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTeam
 		entity = TeamAPIKeyEntity{
 			UID:          newID.String(),
 			Name:         opts.Name,
-			KeyHash:      k.hashKey(newKey.String()),
+			KeyHash:      k.hashKey(newKeyStr),
 			TeamID:       teamEntity.ID,
 			CreatedByUID: &createdBy,
 		}
@@ -381,7 +386,7 @@ func (k *mysqlKeyStorage) CreateKey(ctx context.Context, key *models.CreatedTeam
 	apiKey := &models.CreatedTeamAPIKey{
 		CreatedAt: entity.CreatedAt,
 		ID:        newID,
-		Key:       newKey.String(),
+		Key:       newKeyStr,
 		KeyHash:   entity.KeyHash,
 		Name:      opts.Name,
 		Mask:      models.IdentifierMaskingDetails{},

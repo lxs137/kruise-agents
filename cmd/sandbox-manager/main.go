@@ -24,7 +24,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/spf13/pflag"
 	zapRaw "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -150,9 +149,15 @@ func main() {
 		klog.Fatalf("--peer-selector is required")
 	}
 
-	// Generate admin key if not provided
+	// Generate admin key if not provided; warn if user-provided key has invalid format.
 	if e2bAdminKey == "" {
-		e2bAdminKey = uuid.NewString()
+		generatedKey, err := keys.GenerateAPIKey()
+		if err != nil {
+			klog.Fatalf("failed to generate admin api-key: %v", err)
+		}
+		e2bAdminKey = generatedKey
+	} else if !keys.IsValidAPIKeyFormat(e2bAdminKey) {
+		klog.Warningf("admin api-key does not match standard E2B SDK format (expected e2b_ prefix followed by 40 hex characters)")
 	}
 
 	// Validate positive values

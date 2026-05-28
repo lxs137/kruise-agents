@@ -21,10 +21,72 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/openkruise/agents/pkg/servers/e2b/models"
 )
 
+
+func TestGenerateAPIKey_HasCorrectPrefix(t *testing.T) {
+	key, err := GenerateAPIKey()
+	require.NoError(t, err)
+	assert.Equal(t, APIKeyPrefix, key[:len(APIKeyPrefix)])
+}
+
+func TestIsValidAPIKeyFormat(t *testing.T) {
+	tests := []struct {
+		name   string
+		key    string
+		expect bool
+	}{
+		{
+			name:   "valid 40-char key",
+			key:    "e2b_0123456789abcdef0123456789abcdef01234567",
+			expect: true,
+		},
+		{
+			name:   "valid shorter key",
+			key:    "e2b_abcdef0123456789",
+			expect: true,
+		},
+		{
+			name:   "missing prefix",
+			key:    "sk_0123456789abcdef",
+			expect: false,
+		},
+		{
+			name:   "prefix only without body",
+			key:    "e2b_",
+			expect: false,
+		},
+		{
+			name:   "empty string",
+			key:    "",
+			expect: false,
+		},
+		{
+			name:   "uuid format without prefix",
+			key:    "550e8400-e29b-41d4-a716-446655440000",
+			expect: false,
+		},
+		{
+			name:   "uppercase hex rejected",
+			key:    "e2b_0123456789ABCDEF0123456789abcdef01234567",
+			expect: false,
+		},
+		{
+			name:   "non-hex characters rejected",
+			key:    "e2b_zzzzzzzzzzzzzzzzzzzz",
+			expect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expect, IsValidAPIKeyFormat(tt.key))
+		})
+	}
+}
 func TestTeamForKey(t *testing.T) {
 	tests := []struct {
 		name       string
